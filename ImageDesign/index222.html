@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单拼图 - iOS App 原型</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+        }
+        
+        .ios-phone {
+            max-width: 375px;
+            margin: 0 auto;
+            background: #f5f5f7;
+            min-height: 100vh;
+            position: relative;
+            box-shadow: 0 0 40px rgba(0,0,0,0.1);
+        }
+        
+        .status-bar {
+            height: 44px;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        
+        .page {
+            display: none;
+            min-height: calc(100vh - 44px);
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 375px;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0 24px 0;
+            border-top: 1px solid #333;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: #999;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .nav-item.active {
+            color: #3b82f6;
+        }
+        
+        .canvas-area {
+            background: black;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .image-grid {
+            background: white;
+            position: relative;
+            border: 8px solid white;
+        }
+        
+        .grid-item {
+            background-size: cover;
+            background-position: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .grid-item:active {
+            transform: scale(0.98);
+        }
+        
+        .template-card {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .template-card:active {
+            transform: scale(0.98);
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: flex-end;
+            z-index: 1000;
+            max-width: 375px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #1a1a1a;
+            width: 100%;
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+        
+        .range-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #444;
+            outline: none;
+            border-radius: 2px;
+        }
+        
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        
+        .range-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #3b82f6;
+            cursor: pointer;
+            border-radius: 50%;
+            border: none;
+        }
+        
+        .guide-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            max-width: 375px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .guide-overlay.active {
+            display: flex;
+        }
+        
+        .scroll-container {
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        
+        .scroll-container::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="ios-phone">
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <span id="statusTime">22:43</span>
+            <div class="flex items-center gap-1">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                </svg>
+                <span class="text-xs">53%</span>
+            </div>
+        </div>
+
+        <!-- 主页 -->
+        <div id="homePage" class="page active bg-gray-50">
+            <div class="p-4">
+                <!-- 顶部工具栏 -->
+                <div class="flex justify-between items-center mb-6">
+                    <button class="text-blue-500 text-sm">← App Store</button>
+                    <div class="flex items-center gap-3">
+                        <button class="text-pink-500 text-2xl">👑</button>
+                        <button class="text-xl">Aa</button>
+                        <button class="text-xl">⚙️</button>
+                    </div>
+                </div>
+
+                <!-- 新建区域 -->
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold mb-4">新建</h2>
+                    <div class="bg-white rounded-3xl p-6 shadow-sm">
+                        <!-- 主按钮 -->
+                        <button onclick="goToEditor()" class="w-full bg-black text-white rounded-2xl py-4 mb-6 flex items-center justify-center gap-2 text-lg font-medium">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 12a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zM11 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zM11 12a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+                            </svg>
+                            拼图
+                        </button>
+
+                        <!-- 功能网格 -->
+                        <div class="grid grid-cols-4 gap-6">
+                            <button class="flex flex-col items-center gap-2" onclick="goToEditor()">
+                                <div class="text-3xl">✨</div>
+                                <span class="text-xs text-gray-600">编辑</span>
+                            </button>
+                            <button class="flex flex-col items-center gap-2" onclick="goToEditor()">
+                                <div class="text-3xl">🖼️</div>
+                                <span class="text-xs text-gray-600">自由拼图</span>
+                            </button>
+                            <button class="flex flex-col items-center gap-2" onclick="goToEditor()">
+                                <div class="text-3xl">📋</div>
+                                <span class="text-xs text-gray-600">长图拼接</span>
+                            </button>
+                            <button class="flex flex-col items-center gap-2" onclick="goToEditor()">
+                                <div class="text-3xl">❤️</div>
+                                <span class="text-xs text-gray-600">模板</span>
+                            </button>
+                            <button class="flex flex-col items-center gap-2">
+                                <div class="text-3xl">📱</div>
+                                <span class="text-xs text-gray-600">Live拼图</span>
+                            </button>
+                            <button class="flex flex-col items-center gap-2">
+                                <div class="text-3xl">📖</div>
+                                <span class="text-xs text-gray-600">跨页</span>
+                            </button>
+                            <button class="flex flex-col items-center gap-2">
+                                <div class="text-3xl">🖼️</div>
+                                <span class="text-xs text-gray-600">批量加白边</span>
+                            </button>
+                            <button class="flex flex-col items-center gap-2">
+                                <div class="text-3xl">✂️</div>
+                                <span class="text-xs text-gray-600">切图</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 画布比例 -->
+                <div class="mb-6">
+                    <h2 class="text-xl font-bold mb-4">画布</h2>
+                    <div class="scroll-container flex gap-3">
+                        <button class="flex-shrink-0 w-24 h-28 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center">
+                            <div class="relative mb-2">
+                                <div class="w-12 h-12 bg-gray-100 rounded flex items-center justify-center text-xl">✕</div>
+                                <div class="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">👑</div>
+                            </div>
+                            <span class="text-xs text-gray-600">自定义</span>
+                        </button>
+                        <button onclick="setRatio('1:1')" class="flex-shrink-0 w-24 h-28 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center">
+                            <div class="w-12 h-12 bg-orange-50 rounded mb-2 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z"/>
+                                </svg>
+                            </div>
+                            <span class="text-xs text-gray-600">正方形</span>
+                        </button>
+                        <button onclick="setRatio('4:5')" class="flex-shrink-0 w-24 h-28 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center">
+                            <div class="w-12 h-12 bg-orange-50 rounded mb-2 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z"/>
+                                </svg>
+                            </div>
+                            <span class="text-xs text-gray-600">纵向</span>
+                        </button>
+                        <button onclick="setRatio('16:9')" class="flex-shrink-0 w-24 h-28 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center">
+                            <div class="w-12 h-12 bg-orange-50 rounded mb-2 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z"/>
+                                </svg>
+                            </div>
+                            <span class="text-xs text-gray-600">故事</span>
+                        </button>
+                        <button class="flex-shrink-0 w-24 h-28 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center">
+                            <div class="w-12 h-12 bg-orange-50 rounded mb-2 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16z"/>
+                                </svg>
+                            </div>
+                            <span class="text-xs text-gray-600">Reel</span>
+                        </button>
+                        <button class="flex-shrink-0 w-24 h-28 bg-white rounded-2xl shadow-sm flex flex-col items-center justify-center">
+                            <div class="w-12 h-12 bg-purple-50 rounded mb-2 flex items-center justify-center text-xl">
+                                📱
+                            </div>
+                            <span class="text-xs text-gray-600">抖音</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 模板 -->
+                <div class="mb-24">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">模板</h2>
+                        <button class="text-gray-500">›</button>
+                    </div>
+                    <div class="scroll-container flex gap-3">
+                        <div onclick="goToEditor()" class="template-card flex-shrink-0 w-36 h-64 bg-white rounded-3xl overflow-hidden shadow-sm">
+                            <div class="h-full p-2 grid grid-cols-3 gap-1">
+                                <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=100" class="col-span-3 row-span-3 w-full h-full object-cover rounded-xl"/>
+                                <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=100" class="col-span-3 row-span-3 w-full h-full object-cover rounded-xl"/>
+                                <img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=100" class="col-span-3 row-span-3 w-full h-full object-cover rounded-xl"/>
+                            </div>
+                            <div class="absolute bottom-2 left-2 text-white text-xs font-medium bg-black/30 px-2 py-1 rounded">2025</div>
+                        </div>
+                        <div onclick="goToEditor()" class="template-card flex-shrink-0 w-36 h-64 bg-amber-50 rounded-3xl overflow-hidden shadow-sm p-4 relative">
+                            <div class="space-y-2">
+                                <div class="w-20 h-24 bg-white rounded-xl shadow-md overflow-hidden">
+                                    <img src="https://images.unsplash.com/photo-1467810563316-b5476525c0f9?w=100" class="w-full h-full object-cover"/>
+                                </div>
+                                <div class="w-16 h-20 bg-white rounded-xl shadow-md overflow-hidden ml-auto">
+                                    <img src="https://images.unsplash.com/photo-1511765392-c3bbfe9d7f9f?w=100" class="w-full h-full object-cover"/>
+                                </div>
+                                <div class="w-20 h-24 bg-white rounded-xl shadow-md overflow-hidden">
+                                    <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=100" class="w-full h-full object-cover"/>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-4 right-4 text-amber-600 text-lg font-bold">Hello<br/>2026</div>
+                        </div>
+                        <div onclick="goToEditor()" class="template-card flex-shrink-0 w-36 h-64 bg-black rounded-3xl overflow-hidden shadow-sm p-4 relative">
+                            <div class="space-y-2">
+                                <div class="w-24 h-20 bg-white rounded-xl shadow-md overflow-hidden mx-auto">
+                                    <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=100" class="w-full h-full object-cover"/>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <img src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=100" class="w-full h-16 object-cover rounded-xl"/>
+                                    <img src="https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=100" class="w-full h-16 object-cover rounded-xl"/>
+                                    <img src="https://images.unsplash.com/photo-1511765224389-37f0e77cf0eb?w=100" class="w-full h-16 object-cover rounded-xl"/>
+                                    <img src="https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=100" class="w-full h-16 object-cover rounded-xl"/>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-4 left-4 text-amber-400 text-sm font-bold">Happy<br/>Birthday</div>
+                            <div class="absolute top-4 right-4 text-white text-2xl">✨</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑器页面 -->
+        <div id="editorPage" class="page bg-black">
+            <!-- 顶部导航 -->
+            <div class="flex justify-between items-center px-4 py-3 bg-black text-white">
+                <button onclick="goToHome()" class="text-2xl">‹</button>
+                <button class="text-2xl">?</button>
+                <button onclick="saveCollage()" class="text-blue-500 text-base font-medium">保存</button>
+            </div>
+
+            <!-- 画布区域 -->
+            <div class="canvas-area px-4 py-8" id="canvasArea">
+                <div id="imageGrid" class="image-grid" style="width: 300px; height: 300px;">
+                    <div class="grid grid-cols-5 h-full gap-2">
+                        <div class="grid-item col-span-3 row-span-3" style="background-image: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400')"></div>
+                        <div class="grid-item col-span-2 row-span-2" style="background-image: url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400')"></div>
+                        <div class="grid-item col-span-2 row-span-1" style="background-image: url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400')"></div>
+                        <div class="grid-item col-span-2 row-span-2" style="background-image: url('https://images.unsplash.com/photo-1511765224389-37f0e77cf0eb?w=400')"></div>
+                        <div class="grid-item col-span-3 row-span-2" style="background-image: url('https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400')"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部工具栏 -->
+            <div class="bottom-nav">
+                <button class="nav-item active" onclick="openModal('layoutModal')">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 12a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zM11 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zM11 12a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
+                    </svg>
+                    <span class="text-xs">布局</span>
+                </button>
+                <button class="nav-item" onclick="openModal('borderModal')">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"/>
+                    </svg>
+                    <span class="text-xs">边距</span>
+                </button>
+                <button class="nav-item" onclick="openModal('ratioModal')">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <rect x="3" y="6" width="18" height="12" rx="2" stroke-width="2"/>
+                    </svg>
+                    <span class="text-xs">比例</span>
+                </button>
+                <button class="nav-item" onclick="openModal('bgModal')">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                    </svg>
+                    <span class="text-xs">背景</span>
+                </button>
+                <button class="nav-item" onclick="openModal('textModal')">
+                    <span class="text-xl">Aa</span>
+                    <span class="text-xs">文字</span>
+                </button>
+                <button class="nav-item" onclick="openModal('stickerModal')">
+                    <span class="text-xl">😊</span>
+                    <span class="text-xs">贴纸</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 布局模态框 -->
+        <div id="layoutModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex gap-6">
+                        <button class="text-blue-500 font-medium pb-2 border-b-2 border-blue-500">经典</button>
+                        <button class="text-gray-500 font-medium pb-2">样式</button>
+                    </div>
+                    <button onclick="closeModal('layoutModal')" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <div class="grid grid-cols-4 gap-4">
+                    <button onclick="changeLayout('grid-2x2')" class="aspect-square bg-gray-800 rounded-lg p-2">
+                        <div class="grid grid-cols-2 gap-1 h-full">
+                            <div class="bg-blue-500 rounded"></div>
+                            <div class="bg-blue-500 rounded"></div>
+                            <div class="bg-blue-500 rounded"></div>
+                            <div class="bg-blue-500 rounded"></div>
+                        </div>
+                    </button>
+                    <button onclick="changeLayout('grid-3x3')" class="aspect-square bg-gray-800 rounded-lg p-2">
+                        <div class="grid grid-cols-3 gap-1 h-full">
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                        </div>
+                    </button>
+                    <button onclick="changeLayout('grid-4x4')" class="aspect-square bg-gray-800 rounded-lg p-2">
+                        <div class="grid grid-cols-4 gap-1 h-full">
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                        </div>
+                    </button>
+                    <button onclick="changeLayout('grid-5x5-star')" class="aspect-square bg-gray-800 rounded-lg p-2 relative">
+                        <div class="grid grid-cols-5 gap-1 h-full">
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                        </div>
+                        <div class="absolute top-2 right-2 text-pink-500 text-xl">★</div>
+                    </button>
+                    <button onclick="changeLayout('grid-heart')" class="aspect-square bg-gray-800 rounded-lg p-2 relative">
+                        <div class="grid grid-cols-4 gap-1 h-full">
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                        </div>
+                        <div class="absolute top-2 right-2 text-pink-500 text-xl">❤️</div>
+                    </button>
+                    <button onclick="changeLayout('grid-hexagon')" class="aspect-square bg-gray-800 rounded-lg p-2 relative">
+                        <div class="grid grid-cols-4 gap-1 h-full">
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                        </div>
+                        <div class="absolute top-2 right-2 text-pink-500 text-xl">★</div>
+                    </button>
+                    <button onclick="changeLayout('grid-irregular')" class="aspect-square bg-gray-800 rounded-lg p-2">
+                        <div class="h-full space-y-1">
+                            <div class="flex gap-1 h-1/3">
+                                <div class="bg-white rounded flex-1"></div>
+                                <div class="bg-white rounded flex-1"></div>
+                            </div>
+                            <div class="flex gap-1 h-1/3">
+                                <div class="bg-white rounded flex-1"></div>
+                                <div class="bg-white rounded flex-1"></div>
+                                <div class="bg-white rounded flex-1"></div>
+                            </div>
+                            <div class="bg-white rounded h-1/3"></div>
+                        </div>
+                    </button>
+                    <button onclick="changeLayout('grid-wave')" class="aspect-square bg-gray-800 rounded-lg p-2">
+                        <div class="grid grid-cols-3 gap-1 h-full">
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                            <div class="bg-white rounded"></div>
+                        </div>
+                    </button>
+                </div>
+                <div class="mt-6 text-center">
+                    <p class="text-gray-400 text-sm">点击布局样式即可应用</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 边距模态框 -->
+        <div id="borderModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-white font-medium text-lg">边距调整</h3>
+                    <button onclick="closeModal('borderModal')" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <div class="flex justify-between text-white mb-3">
+                            <span class="text-sm flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"/>
+                                </svg>
+                                外边距
+                            </span>
+                            <span class="text-sm" id="outerMarginValue">10</span>
+                        </div>
+                        <input type="range" class="range-slider" min="0" max="50" value="10" oninput="updateMargin('outer', this.value)">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-white mb-3">
+                            <span class="text-sm flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <rect x="7" y="7" width="10" height="10" rx="1" stroke-width="2"/>
+                                </svg>
+                                内边距
+                            </span>
+                            <span class="text-sm" id="innerMarginValue">10</span>
+                        </div>
+                        <input type="range" class="range-slider" min="0" max="50" value="10" oninput="updateMargin('inner', this.value)">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-white mb-3">
+                            <span class="text-sm flex items-center gap-2">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                </svg>
+                                圆角
+                            </span>
+                            <span class="text-sm" id="roundnessValue">0</span>
+                        </div>
+                        <input type="range" class="range-slider" min="0" max="50" value="0" oninput="updateRoundness(this.value)">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 比例模态框 -->
+        <div id="ratioModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-white font-medium text-lg">选择比例</h3>
+                    <button onclick="closeModal('ratioModal')" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <button onclick="applyRatio('1:1')" class="aspect-square bg-gray-800 rounded-lg flex flex-col items-center justify-center">
+                        <div class="w-12 h-12 border-2 border-white rounded mb-2"></div>
+                        <span class="text-white text-sm">自定义</span>
+                    </button>
+                    <button onclick="applyRatio('1:1')" class="aspect-square bg-gray-800 rounded-lg flex flex-col items-center justify-center border-2 border-blue-500">
+                        <div class="w-12 h-12 bg-blue-500 rounded mb-2"></div>
+                        <span class="text-white text-sm">1:1</span>
+                    </button>
+                    <button onclick="applyRatio('4:5')" class="aspect-square bg-gray-800 rounded-lg flex flex-col items-center justify-center">
+                        <div class="w-10 h-12 bg-gray-600 rounded mb-2"></div>
+                        <span class="text-white text-sm">4:5</span>
+                    </button>
+                    <button onclick="applyRatio('5:4')" class="aspect-square bg-gray-800 rounded-lg flex flex-col items-center justify-center">
+                        <div class="w-12 h-10 bg-gray-600 rounded mb-2"></div>
+                        <span class="text-white text-sm">5:4</span>
+                    </button>
+                    <button onclick="applyRatio('9:16')" class="aspect-square bg-gray-800 rounded-lg flex flex-col items-center justify-center">
+                        <div class="w-8 h-14 bg-gray-600 rounded mb-2"></div>
+                        <span class="text-white text-sm">墙纸</span>
+                    </button>
+                    <button onclick="applyRatio('9:16')" class="aspect-square bg-gray-800 rounded-lg flex flex-col items-center justify-center">
+                        <div class="w-8 h-14 bg-gray-600 rounded mb-2"></div>
+                        <span class="text-white text-sm">9:16</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 背景模态框 -->
+        <div id="bgModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-white font-medium text-lg">背景</h3>
+                    <button onclick="closeModal('bgModal')" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <div class="grid grid-cols-4 gap-3">
+                    <button class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center text-2xl">🖼️</div>
+                        <span class="text-white text-xs">照片</span>
+                    </button>
+                    <button onclick="applyBg('eyedropper')" class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center text-2xl">💧</div>
+                        <span class="text-white text-xs">吸色</span>
+                    </button>
+                    <button onclick="applyBg('white')" class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 bg-white rounded-lg"></div>
+                        <span class="text-white text-xs">白色</span>
+                    </button>
+                    <button onclick="applyBg('black')" class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 bg-black border border-gray-700 rounded-lg"></div>
+                        <span class="text-white text-xs">黑色</span>
+                    </button>
+                    <button onclick="applyBg('blur')" class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center text-xl">💧</div>
+                        <span class="text-white text-xs">模糊</span>
+                    </button>
+                    <button onclick="applyBg('solid')" class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 rounded-lg" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)"></div>
+                        <span class="text-white text-xs">纯色</span>
+                    </button>
+                    <button onclick="applyBg('gradient')" class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 rounded-lg grid grid-cols-2 gap-1">
+                            <div class="bg-red-400"></div>
+                            <div class="bg-pink-400"></div>
+                            <div class="bg-orange-400"></div>
+                            <div class="bg-yellow-400"></div>
+                        </div>
+                        <span class="text-white text-xs">渐变</span>
+                    </button>
+                    <button class="flex flex-col items-center gap-2">
+                        <div class="w-16 h-16 bg-gradient-to-br from-yellow-200 to-pink-200 rounded-lg flex items-center justify-center text-xl">🎂</div>
+                        <span class="text-white text-xs">生日</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文字模态框 -->
+        <div id="textModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-white font-medium text-lg">添加文字</h3>
+                    <button onclick="closeModal('textModal')" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <input type="text" placeholder="输入文字..." class="w-full bg-gray-800 text-white px-4 py-3 rounded-lg mb-4 outline-none">
+                <div class="grid grid-cols-4 gap-3">
+                    <button class="bg-gray-800 text-white py-2 rounded-lg text-sm">加粗</button>
+                    <button class="bg-gray-800 text-white py-2 rounded-lg text-sm italic">斜体</button>
+                    <button class="bg-gray-800 text-white py-2 rounded-lg text-sm underline">下划线</button>
+                    <button class="bg-gray-800 text-white py-2 rounded-lg text-sm">颜色</button>
+                </div>
+                <button onclick="addText(); closeModal('textModal')" class="w-full bg-blue-500 text-white py-3 rounded-lg mt-4">添加</button>
+            </div>
+        </div>
+
+        <!-- 贴纸模态框 -->
+        <div id="stickerModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-white font-medium text-lg">贴纸</h3>
+                    <button onclick="closeModal('stickerModal')" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <div class="flex gap-3 mb-4 overflow-x-auto">
+                    <button class="px-4 py-2 bg-pink-600 text-white rounded-full text-xs whitespace-nowrap">Pro</button>
+                    <button class="px-4 py-2 bg-gray-800 text-white rounded-full text-xs whitespace-nowrap">🖼️</button>
+                    <button class="px-4 py-2 bg-gray-800 text-white rounded-full text-xs whitespace-nowrap">✂️</button>
+                    <button class="px-4 py-2 bg-blue-500 text-white rounded-full text-xs whitespace-nowrap">😀</button>
+                    <button class="px-4 py-2 bg-gray-800 text-white rounded-full text-xs whitespace-nowrap">🎅</button>
+                    <button class="px-4 py-2 bg-gray-800 text-white rounded-full text-xs whitespace-nowrap">🎄</button>
+                </div>
+                <div class="grid grid-cols-6 gap-3">
+                    <button onclick="addSticker('😊')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😊</button>
+                    <button onclick="addSticker('😂')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😂</button>
+                    <button onclick="addSticker('😍')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😍</button>
+                    <button onclick="addSticker('🥰')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🥰</button>
+                    <button onclick="addSticker('😘')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😘</button>
+                    <button onclick="addSticker('😁')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😁</button>
+                    <button onclick="addSticker('🤣')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🤣</button>
+                    <button onclick="addSticker('😇')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😇</button>
+                    <button onclick="addSticker('🙂')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🙂</button>
+                    <button onclick="addSticker('🥳')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🥳</button>
+                    <button onclick="addSticker('😎')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😎</button>
+                    <button onclick="addSticker('😋')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">😋</button>
+                    <button onclick="addSticker('🎅')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🎅</button>
+                    <button onclick="addSticker('🎄')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🎄</button>
+                    <button onclick="addSticker('⭐')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">⭐</button>
+                    <button onclick="addSticker('✨')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">✨</button>
+                    <button onclick="addSticker('🎁')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🎁</button>
+                    <button onclick="addSticker('🎉')" class="text-3xl aspect-square bg-gray-800 rounded-lg flex items-center justify-center">🎉</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 滤镜模态框 -->
+        <div id="filterModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex gap-6">
+                        <button class="text-blue-500 font-medium pb-2 border-b-2 border-blue-500">滤镜</button>
+                        <button class="text-gray-500 font-medium pb-2">调整</button>
+                    </div>
+                    <button onclick="closeModal('filterModal')" class="text-gray-400 text-2xl">&times;</button>
+                </div>
+                <div class="scroll-container flex gap-3">
+                    <button onclick="applyFilter('original')" class="flex-shrink-0 flex flex-col items-center gap-2">
+                        <div class="w-20 h-24 rounded-lg overflow-hidden">
+                            <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200" class="w-full h-full object-cover"/>
+                        </div>
+                        <span class="text-white text-xs">原片</span>
+                    </button>
+                    <button onclick="applyFilter('warm')" class="flex-shrink-0 flex flex-col items-center gap-2">
+                        <div class="w-20 h-24 rounded-lg overflow-hidden bg-gray-800">
+                            <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200" class="w-full h-full object-cover" style="filter: sepia(0.3) saturate(1.2)"/>
+                        </div>
+                        <span class="text-white text-xs">Warm</span>
+                    </button>
+                    <button onclick="applyFilter('cold')" class="flex-shrink-0 flex flex-col items-center gap-2">
+                        <div class="w-20 h-24 rounded-lg overflow-hidden bg-gray-800">
+                            <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200" class="w-full h-full object-cover" style="filter: hue-rotate(180deg) saturate(0.8)"/>
+                        </div>
+                        <span class="text-white text-xs">Cold</span>
+                    </button>
+                    <button onclick="applyFilter('sunrise')" class="flex-shrink-0 flex flex-col items-center gap-2">
+                        <div class="w-20 h-24 rounded-lg overflow-hidden bg-gray-800">
+                            <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200" class="w-full h-full object-cover" style="filter: brightness(1.1) contrast(1.1)"/>
+                        </div>
+                        <span class="text-white text-xs">Sunrise</span>
+                    </button>
+                    <button onclick="applyFilter('sunset')" class="flex-shrink-0 flex flex-col items-center gap-2">
+                        <div class="w-20 h-24 rounded-lg overflow-hidden bg-gray-800">
+                            <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200" class="w-full h-full object-cover" style="filter: sepia(0.5) saturate(1.3)"/>
+                        </div>
+                        <span class="text-white text-xs">Sunset</span>
+                    </button>
+                    <button onclick="applyFilter('night')" class="flex-shrink-0 flex flex-col items-center gap-2">
+                        <div class="w-20 h-24 rounded-lg overflow-hidden bg-gray-800">
+                            <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200" class="w-full h-full object-cover" style="filter: brightness(0.7) saturate(1.2) hue-rotate(200deg)"/>
+                        </div>
+                        <span class="text-white text-xs">Night</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 引导提示 -->
+        <div id="guideOverlay" class="guide-overlay">
+            <div class="p-8 text-center">
+                <div class="mb-6">
+                    <h3 class="text-white text-xl font-bold mb-2">提示</h3>
+                    <p class="text-gray-300 mb-4">点击照片进行编辑</p>
+                </div>
+                <div class="bg-white rounded-2xl p-4 mb-6 inline-block">
+                    <div class="grid grid-cols-2 gap-2">
+                        <img src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=200" class="w-32 h-32 object-cover rounded-lg"/>
+                        <img src="https://images.unsplash.com/photo-1552053831-71594a27632d?w=200" class="w-32 h-32 object-cover rounded-lg"/>
+                        <img src="https://images.unsplash.com/photo-1444212477490-ca407925329e?w=200" class="w-32 h-32 object-cover rounded-lg"/>
+                        <img src="https://images.unsplash.com/photo-1552053831-71594a27632d?w=200" class="w-32 h-32 object-cover rounded-lg"/>
+                    </div>
+                </div>
+                <div class="flex justify-center gap-2 mb-6">
+                    <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div class="w-2 h-2 bg-gray-500 rounded-full"></div>
+                </div>
+                <button onclick="closeGuide()" class="bg-white text-black px-12 py-3 rounded-full font-medium">好的</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 状态管理
+        let currentPage = 'homePage';
+        let currentLayout = 'grid-5x5';
+        let currentRatio = '1:1';
+        let currentBg = 'black';
+        let outerMargin = 10;
+        let innerMargin = 10;
+        let roundness = 0;
+
+        // 更新时间
+        function updateTime() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('statusTime').textContent = `${hours}:${minutes}`;
+        }
+        updateTime();
+        setInterval(updateTime, 60000);
+
+        // 页面导航
+        function goToEditor() {
+            document.getElementById('homePage').classList.remove('active');
+            document.getElementById('editorPage').classList.add('active');
+            currentPage = 'editorPage';
+            
+            // 显示引导提示
+            setTimeout(() => {
+                document.getElementById('guideOverlay').classList.add('active');
+            }, 500);
+        }
+
+        function goToHome() {
+            document.getElementById('editorPage').classList.remove('active');
+            document.getElementById('homePage').classList.add('active');
+            currentPage = 'homePage';
+        }
+
+        // 模态框控制
+        function openModal(modalId) {
+            // 如果是滤镜功能，从底部工具栏触发
+            if (modalId === 'filterModal') {
+                document.getElementById(modalId).classList.add('active');
+                return;
+            }
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function closeGuide() {
+            document.getElementById('guideOverlay').classList.remove('active');
+        }
+
+        // 关闭模态框（点击背景）
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.remove('active');
+                }
+            });
+        });
+
+        // 布局切换
+        function changeLayout(layout) {
+            currentLayout = layout;
+            const gridElement = document.getElementById('imageGrid').querySelector('div');
+            
+            const images = [
+                'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
+                'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400',
+                'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400',
+                'https://images.unsplash.com/photo-1511765224389-37f0e77cf0eb?w=400',
+                'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400',
+                'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400',
+                'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=400',
+                'https://images.unsplash.com/photo-1503803548695-c2a7b4a5b875?w=400',
+                'https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=400'
+            ];
+            
+            if (layout === 'grid-2x2') {
+                gridElement.className = 'grid grid-cols-2 h-full gap-2';
+                gridElement.innerHTML = images.slice(0, 4).map(img => 
+                    `<div class="grid-item" style="background-image: url('${img}')"></div>`
+                ).join('');
+            } else if (layout === 'grid-3x3') {
+                gridElement.className = 'grid grid-cols-3 h-full gap-2';
+                gridElement.innerHTML = images.slice(0, 9).map(img => 
+                    `<div class="grid-item" style="background-image: url('${img}')"></div>`
+                ).join('');
+            } else if (layout === 'grid-4x4') {
+                gridElement.className = 'grid grid-cols-4 h-full gap-2';
+                gridElement.innerHTML = images.slice(0, 9).map(img => 
+                    `<div class="grid-item" style="background-image: url('${img}')"></div>`
+                ).join('');
+            }
+            
+            closeModal('layoutModal');
+        }
+
+        // 边距调整
+        function updateMargin(type, value) {
+            if (type === 'outer') {
+                outerMargin = value;
+                document.getElementById('outerMarginValue').textContent = value;
+                document.getElementById('imageGrid').style.border = `${value}px solid white`;
+            } else {
+                innerMargin = value;
+                document.getElementById('innerMarginValue').textContent = value;
+                const gridElement = document.getElementById('imageGrid').querySelector('div');
+                gridElement.style.gap = `${value}px`;
+            }
+        }
+
+        function updateRoundness(value) {
+            roundness = value;
+            document.getElementById('roundnessValue').textContent = value;
+            document.getElementById('imageGrid').style.borderRadius = `${value}px`;
+        }
+
+        // 比例调整
+        function setRatio(ratio) {
+            currentRatio = ratio;
+            applyRatio(ratio);
+        }
+
+        function applyRatio(ratio) {
+            const grid = document.getElementById('imageGrid');
+            const ratios = {
+                '1:1': [300, 300],
+                '4:5': [280, 350],
+                '5:4': [350, 280],
+                '9:16': [250, 445],
+                '16:9': [445, 250]
+            };
+            
+            const [width, height] = ratios[ratio] || [300, 300];
+            grid.style.width = `${width}px`;
+            grid.style.height = `${height}px`;
+            
+            closeModal('ratioModal');
+        }
+
+        // 背景调整
+        function applyBg(bgType) {
+            const canvas = document.getElementById('canvasArea');
+            
+            switch(bgType) {
+                case 'white':
+                    canvas.style.background = 'white';
+                    break;
+                case 'black':
+                    canvas.style.background = 'black';
+                    break;
+                case 'blur':
+                    canvas.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    canvas.style.filter = 'blur(100px)';
+                    break;
+                case 'solid':
+                    canvas.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    canvas.style.filter = 'none';
+                    break;
+                case 'gradient':
+                    canvas.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+                    canvas.style.filter = 'none';
+                    break;
+            }
+            
+            closeModal('bgModal');
+        }
+
+        // 添加文字
+        function addText() {
+            const canvas = document.getElementById('canvasArea');
+            const text = document.createElement('div');
+            text.className = 'absolute text-white text-2xl font-bold';
+            text.style.top = '50%';
+            text.style.left = '50%';
+            text.style.transform = 'translate(-50%, -50%)';
+            text.textContent = '双击编辑文字';
+            text.contentEditable = true;
+            canvas.appendChild(text);
+        }
+
+        // 添加贴纸
+        function addSticker(emoji) {
+            const canvas = document.getElementById('canvasArea');
+            const sticker = document.createElement('div');
+            sticker.className = 'absolute text-5xl cursor-move';
+            sticker.style.top = `${Math.random() * 50 + 25}%`;
+            sticker.style.left = `${Math.random() * 50 + 25}%`;
+            sticker.textContent = emoji;
+            
+            // 简单的拖拽功能
+            let isDragging = false;
+            let currentX, currentY, initialX, initialY;
+            
+            sticker.addEventListener('touchstart', dragStart);
+            sticker.addEventListener('touchmove', drag);
+            sticker.addEventListener('touchend', dragEnd);
+            
+            function dragStart(e) {
+                initialX = e.touches[0].clientX - sticker.offsetLeft;
+                initialY = e.touches[0].clientY - sticker.offsetTop;
+                isDragging = true;
+            }
+            
+            function drag(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    currentX = e.touches[0].clientX - initialX;
+                    currentY = e.touches[0].clientY - initialY;
+                    sticker.style.left = currentX + 'px';
+                    sticker.style.top = currentY + 'px';
+                }
+            }
+            
+            function dragEnd() {
+                isDragging = false;
+            }
+            
+            canvas.appendChild(sticker);
+            closeModal('stickerModal');
+        }
+
+        // 滤镜应用
+        function applyFilter(filterName) {
+            const gridItems = document.querySelectorAll('.grid-item');
+            const filters = {
+                'original': 'none',
+                'warm': 'sepia(0.3) saturate(1.2)',
+                'cold': 'hue-rotate(180deg) saturate(0.8)',
+                'sunrise': 'brightness(1.1) contrast(1.1)',
+                'sunset': 'sepia(0.5) saturate(1.3)',
+                'night': 'brightness(0.7) saturate(1.2) hue-rotate(200deg)'
+            };
+            
+            gridItems.forEach(item => {
+                item.style.filter = filters[filterName] || 'none';
+            });
+            
+            closeModal('filterModal');
+        }
+
+        // 保存拼图
+        function saveCollage() {
+            // 模拟保存动画
+            const saveBtn = event.target;
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = '保存中...';
+            saveBtn.style.opacity = '0.6';
+            
+            setTimeout(() => {
+                saveBtn.textContent = '已保存 ✓';
+                saveBtn.style.color = '#10b981';
+                
+                setTimeout(() => {
+                    saveBtn.textContent = originalText;
+                    saveBtn.style.color = '#3b82f6';
+                    saveBtn.style.opacity = '1';
+                    
+                    // 显示分享选项
+                    if (confirm('拼图已保存！是否要分享到社交平台？')) {
+                        alert('分享功能：可以分享到微信、微博、Instagram等平台');
+                    }
+                }, 1500);
+            }, 1000);
+        }
+
+        // 添加滤镜按钮到底部工具栏
+        window.addEventListener('load', function() {
+            const bottomNav = document.querySelector('#editorPage .bottom-nav');
+            if (bottomNav && bottomNav.children.length === 6) {
+                // 滤镜按钮已存在或需要手动添加
+                // 可以通过点击贴纸右边的位置来访问
+            }
+        });
+
+        // 点击图片网格项可以替换图片
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('grid-item')) {
+                const newImages = [
+                    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
+                    'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400',
+                    'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=400',
+                    'https://images.unsplash.com/photo-1511765224389-37f0e77cf0eb?w=400',
+                    'https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=400',
+                    'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400'
+                ];
+                const randomImage = newImages[Math.floor(Math.random() * newImages.length)];
+                e.target.style.backgroundImage = `url('${randomImage}')`;
+                
+                // 添加点击反馈
+                e.target.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    e.target.style.transform = 'scale(1)';
+                }, 150);
+            }
+        });
+
+        // 添加滤镜功能的快捷访问
+        // 可以通过长按图片来打开滤镜
+        let longPressTimer;
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.classList.contains('grid-item')) {
+                longPressTimer = setTimeout(() => {
+                    openModal('filterModal');
+                }, 500);
+            }
+        });
+
+        document.addEventListener('touchend', function() {
+            clearTimeout(longPressTimer);
+        });
+    </script>
+</body>
+</html>
+
